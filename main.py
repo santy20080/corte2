@@ -1,121 +1,99 @@
-from fastapi import FastAPI, Body, HTTPException
+from fastapi import FastAPI, Body
+import csv
 
 app = FastAPI()
 
-productos = [
-    {
-        "codigo": 1,
-        "nombre": "esfero",
-        "valor": 3500,
-        "existencias": 10
-    },
-    {
-        "codigo": 2,
-        "nombre": "cuaderno",
-        "valor": 5000,
-        "existencias": 15
-    },
-    {
-        "codigo": 3,
-        "nombre": "lapiz",
-        "valor": 200,
-        "existencias": 12
-    }
-]
+archivo = "productos.csv"
 
-@app.get("/productoall/")
-def listProductos():
-    return productos
+# leer productos
+def leer():
+    datos = []
+    try:
+        with open(archivo, "r") as f:
+            lector = csv.DictReader(f)
+            for x in lector:
+                datos.append({
+                    "codigo": int(x["codigo"]),
+                    "nombre": x["nombre"],
+                    "valor": float(x["valor"]),
+                    "existencias": int(x["existencias"])
+                })
+    except:
+        pass
+    return datos
 
+# guardar productos
+def guardar(datos):
+    with open(archivo, "w", newline="") as f:
+        campos = ["codigo", "nombre", "valor", "existencias"]
+        writer = csv.DictWriter(f, fieldnames=campos)
+        writer.writeheader()
+        writer.writerows(datos)
+
+# ver todos
+@app.get("/productos")
+def todos():
+    return leer()
+
+# buscar por codigo
 @app.get("/producto/{cod}")
-def findProducto(cod: int):
-    for prod in productos:
-        if prod["codigo"] == cod:
-            return prod
-    return {"mensaje": "Producto no encontrado"}
+def uno(cod: int):
+    datos = leer()
+    for p in datos:
+        if p["codigo"] == cod:
+            return p
+    return {"mensaje": "no existe"}
 
-@app.get("/producto/")
-def findProductos2(nom: str):
-    for prod in productos:
-        if prod["nombre"].lower() == nom.lower():
-            return prod
-    return {"mensaje": "Producto no encontrado"}
-
+# crear producto
 @app.post("/productos")
-def createProducto(cod: int, nom: str, val: float, exi: int):
-    if val <= 0 or exi <= 0:
-        return {"mensaje": "El valor y las existencias deben ser mayores a cero"}
-    
-    # Verifica que el código sea el siguiente consecutivo
-    if cod != max([prod["codigo"] for prod in productos]) + 1:
-        return {"mensaje": "El código debe ser el siguiente consecutivo"}
-
-    productos.append({
-        "codigo": cod,
-        "nombre": nom,
-        "valor": val,
-        "existencias": exi,
-    })
-    return productos
-
-@app.post("/productos2")
-def createProducto2(
+def crear(
     cod: int = Body(),
     nom: str = Body(),
     val: float = Body(),
     exi: int = Body()
 ):
-    if val <= 0 or exi <= 0:
-        return {"mensaje": "El valor y las existencias deben ser mayores a cero"}
+    datos = leer()
 
-    # Verifica que el código sea el siguiente consecutivo
-    if cod != max([prod["codigo"] for prod in productos]) + 1:
-        return {"mensaje": "El código debe ser el siguiente consecutivo"}
-
-    productos.append({
+    nuevo = {
         "codigo": cod,
         "nombre": nom,
         "valor": val,
-        "existencias": exi,
-    })
-    return productos
+        "existencias": exi
+    }
 
+    datos.append(nuevo)
+    guardar(datos)
+    return nuevo
+
+# actualizar
 @app.put("/productos/{cod}")
-def updateProducto(
+def actualizar(
     cod: int,
     nom: str = Body(),
     val: float = Body(),
     exi: int = Body()
 ):
-    producto = None
-    for prod in productos:
-        if prod["codigo"] == cod:
-            producto = prod
-            break
+    datos = leer()
 
-    if not producto:
-        return {"mensaje": "Producto no encontrado"}
+    for p in datos:
+        if p["codigo"] == cod:
+            p["nombre"] = nom
+            p["valor"] = val
+            p["existencias"] = exi
+            guardar(datos)
+            return p
 
-    if val <= 0 or exi <= 0:
-        return {"mensaje": "El valor y las existencias deben ser mayores a cero"}
+    return {"mensaje": "no encontrado"}
 
-    # Mostrar producto original y actualizado
-    producto_original = producto.copy()
-    producto["nombre"] = nom
-    producto["valor"] = val
-    producto["existencias"] = exi
-    return {"producto_original": producto_original, "producto_actualizado": producto}
+# eliminar
+@app.delete("/productos/{cod}")
+def eliminar(cod: int):
+    datos = leer()
 
-@app.delete("/productos")
-def deleteProducto(cod: int):
-    producto = None
-    for prod in productos:
-        if prod["codigo"] == cod:
-            producto = prod
-            break
+    for p in datos:
+        if p["codigo"] == cod:
+            datos.remove(p)
+            guardar(datos)
+            return {"eliminado": p}
 
-    if not producto:
-        return {"mensaje": "Producto no encontrado"}
-
-    productos.remove(producto)
-    return {"producto_eliminado": producto}
+    return {"mensaje": "no encontrado"}
