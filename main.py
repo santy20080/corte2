@@ -1,9 +1,17 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
+from pydantic import BaseModel
 import csv
 
 app = FastAPI()
 
 archivo = "productos.csv"
+
+# modelo json
+class Producto(BaseModel):
+    codigo: int
+    nombre: str
+    valor: float
+    existencias: int
 
 # leer productos
 def leer():
@@ -44,42 +52,57 @@ def uno(cod: int):
             return p
     return {"mensaje": "no existe"}
 
-# crear producto
+# crear producto (json + validaciones)
 @app.post("/productos")
-def crear(
-    cod: int = Body(),
-    nom: str = Body(),
-    val: float = Body(),
-    exi: int = Body()
-):
+def crear(producto: Producto):
     datos = leer()
 
+    if producto.codigo <= 0:
+        return {"mensaje": "codigo invalido"}
+
+    if producto.valor <= 0:
+        return {"mensaje": "valor invalido"}
+
+    if producto.existencias < 0:
+        return {"mensaje": "existencias invalidas"}
+
+    if producto.nombre.strip() == "":
+        return {"mensaje": "nombre vacio"}
+
+    for p in datos:
+        if p["codigo"] == producto.codigo:
+            return {"mensaje": "codigo repetido"}
+
     nuevo = {
-        "codigo": cod,
-        "nombre": nom,
-        "valor": val,
-        "existencias": exi
+        "codigo": producto.codigo,
+        "nombre": producto.nombre,
+        "valor": producto.valor,
+        "existencias": producto.existencias
     }
 
     datos.append(nuevo)
     guardar(datos)
     return nuevo
 
-# actualizar
+# actualizar (con validaciones basicas)
 @app.put("/productos/{cod}")
-def actualizar(
-    cod: int,
-    nom: str = Body(),
-    val: float = Body(),
-    exi: int = Body()
-):
+def actualizar(cod: int, producto: Producto):
     datos = leer()
+
+    if producto.valor <= 0:
+        return {"mensaje": "valor invalido"}
+
+    if producto.existencias < 0:
+        return {"mensaje": "existencias invalidas"}
+
+    if producto.nombre.strip() == "":
+        return {"mensaje": "nombre vacio"}
 
     for p in datos:
         if p["codigo"] == cod:
-            p["nombre"] = nom
-            p["valor"] = val
-            p["existencias"] = exi
+            p["nombre"] = producto.nombre
+            p["valor"] = producto.valor
+            p["existencias"] = producto.existencias
             guardar(datos)
             return p
 
